@@ -147,7 +147,7 @@ def calc_score(result, answer):
     elif len_result == len_answer and len_intersection == len_answer:
         m = 1.0
     elif len_intersection == len_result:
-        # all results correspond to a correct answer, but some 
+        # all results correspond to a correct answer, but some
         # answers are missing
         m = 0.95
     elif len_intersection == len_answer:
@@ -205,11 +205,15 @@ def main(years, grading):
     types = ['spelling', 'completeness']
 
     scores = {y: {g: {t:0 for t in types} for g in grading} for y in years}
+    print("scores: ", scores)
+
     for y in years:
         with open('gg%sanswers.json' % y, 'r') as f:
             answers = json.load(f)
 
+        # keys of values in "award_data"
         answers['awards'] = list(answers['award_data'].keys())
+        print('\nanswers-awards: ', answers['awards'])
 
         for g in grading:
             if g in ['hosts', 'awards']:
@@ -224,6 +228,9 @@ def main(years, grading):
 if __name__ == '__main__':
     years = ['2013', '2015']
     grading = ["hosts", "awards", "nominees", "presenters", "winner"]
+
+    # sys.argv:  ['autograder.py', '2013']
+    print('sys.argv: ', sys.argv)
 
     if len(sys.argv) > 1:
         if '2013' in sys.argv:

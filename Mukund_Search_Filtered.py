@@ -296,11 +296,11 @@ def databaseSearcher(resultsSoFar, category, database):
                 for searchResult in database.search_person(result):
                     searchResAsString = str(searchResult)
                     properResult = re.sub("\s*nickname", "", searchResAsString) # Occurrences of nickname can pop up
-                    if edit_distance(result, properResult) < 5:
+                    if edit_distance(result, properResult) < 3:
                         goodSearchResults.append(properResult.lower())
                 for searchResult in database.search_movie(result):
                     searchResAsString = str(searchResult)
-                    if edit_distance(result, searchResAsString) < 5:
+                    if edit_distance(result, searchResAsString) < 3:
                         goodSearchResults.append(searchResAsString.lower())
                 searchCounter += 1
                 print("Completed " + str(searchCounter) + " searches of " + str(len(resultsSoFar)) + " total.")
@@ -337,7 +337,6 @@ def main():
         print()
         print("The winners:")
         relevantTweets = keywordSearch(data, winnerKeywords)
-        # relevantTweets = awardTweetFinder(data)
         topUnigrams, topBigrams = ngramDetector(relevantTweets)
 
         # This is the final set of people
@@ -349,7 +348,6 @@ def main():
         # print()
         # print("The nominees:")
         # relevantTweets = keywordSearch(data, nomineeKeywords)
-        # # relevantTweets = awardTweetFinder(data)
         # topUnigrams, topBigrams = ngramDetector(relevantTweets)
         #
         # # This is the final set of people

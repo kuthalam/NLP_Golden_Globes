@@ -9,6 +9,10 @@
 # Reading JSON from a file: https://www.programiz.com/python-programming/json
 # Numpy documentation: https://numpy.org/doc/1.20/
 
+OFFICIAL_AWARDS_1819 = ['best motion picture', 'best performance by an actress', 'best actress', 'best performance by an actor', 'best actor', 'best director',
+'best screenplay', 'best motion picture', 'best foreign film', 'best original score', 'best original song', 'best television series', 'best tv series',
+'cecil b. demille award']
+
 ###### Library imports
 import json
 import numpy as np
@@ -16,7 +20,10 @@ import time
 import nltk
 import re
 import string
+import math
 from nltk.tokenize import wordpunct_tokenize
+from nltk.corpus import stopwords
+from nltk.metrics.distance import edit_distance
 from imdb import IMDb, IMDbError
 
 ###### Globals
@@ -108,17 +115,13 @@ def multiCharaFilter(givenWord):
 def keywordSearch(tweetData, guide):
     start_time = time.time()
     # First set up a dictionary of the tweets that correspond to each keyword
-    relevantTweets = dict() # Unlikely that any two tweets would be identical
+    relevantTweets = set() # Unlikely that any two tweets would be identical
     allKeywords = list(guide.keys()) # All the keywords to search for
-
-    # Sets up a dictionary for collecting and maintaining relevant tweets
-    for word in guide:
-        relevantTweets[word] = set()
 
     for tweet in tweetData:
         # Preprocess each tweet
         processedTweet = retweetPhraseRemover(tweet["text"])
-        processedTweet = puncRemover(processedTweet.lower())
+        processedTweet = puncRemover(processedTweet)
         processedTweet = emojiRemover(processedTweet)
         if foreignLangDetector(processedTweet):
             continue
@@ -127,9 +130,10 @@ def keywordSearch(tweetData, guide):
         for word in guide:
             if word in processedTweet:
                 if guide[word] == "left":
-                    relevantTweets[word].add(processedTweet[:processedTweet.index(word)])
+                    relevantTweets.add(processedTweet[:processedTweet.index(word)])
                 else:
-                    relevantTweets[word].add(processedTweet[processedTweet.index(word):])
+                    startIdx = processedTweet.index(word) + len(word) + 1
+                    relevantTweets.add(processedTweet[startIdx:])
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -166,34 +170,100 @@ def properNounFinder(tweetData):
     return candidates
 
 #############################################################
-# Name: resultCombiner                                      #
-# Params: usefulTweets (tweets with keyword)                #
-# potentialWinners (the set of names to look for)           #
-# Notes: Returns the proper nouns that were found in tweets #
-# with keywords.                                            #
+# Name: awardTweetFinder                                    #
+# Params: tweetData (tweet data from given json)            #
+# Notes: Returns the proper nouns (i.e. names) in the       #
+# tweet data. Main pre-DB search bottleneck.                #
 #############################################################
-def resultCombiner(usefulTweets, potentialWinners):
+def awardTweetFinder(tweetData):
     start_time = time.time()
-    likelyCand = set()
-    for word in usefulTweets.keys(): # For each keyword used to filter the tweets
-        currentSet = usefulTweets[word]
-        prunedSet = set()
+    usefulTweets = set()
+    for tweet in tweetData:
+        # First some pre-processing
+        processedTweet = retweetPhraseRemover(tweet["text"])
+        processedTweet = puncRemover(processedTweet)
+        processedTweet = emojiRemover(processedTweet)
+        if foreignLangDetector(processedTweet):
+            continue
 
-        # Check if some of the proper nouns from before are in each tweet.
-        # Collect the proper nouns that satisfy this
-        for tweet in currentSet:
-            for winner in potentialWinners:
-                if winner in tweet:
-                    prunedSet.add(winner)
-
-        # Now we collect all of these candidates. The "voting" happens
-        # when we search the database.
-        likelyCand = likelyCand.union(prunedSet) # Helps avoid reference issues
+        # Then we filter down to the tweets that mention the awards
+        for award in OFFICIAL_AWARDS_1819:
+            if award in processedTweet:
+                usefulTweets.add(processedTweet)
 
     end_time = time.time()
     total_time = end_time - start_time
-    print("Total time for result combiner: " + str(total_time))
-    return likelyCand
+    print("Total time for award tweet finder: " + str(total_time))
+    return usefulTweets
+
+#############################################################
+# Name: ngramDetector                                       #
+# Params: tweetData (tweets that were filtered through the  #
+# award tweet rule)                                         #
+# Notes: Returns the proper nouns (i.e. names) in the       #
+# tweet data. Main pre-DB search bottleneck.                #
+#############################################################
+def ngramDetector(tweetData):
+    start = time.time()
+    words = dict()
+    bigrams = dict()
+    bigramCount = 0
+    ngramsRet = 100 # How many ngrams to return
+
+    for tweet in tweetData:
+        sentence = tweet.split() # Split sentence into words
+        cleanedSentence = list()
+
+        # Remove the undesired punctuation from the strings
+        for w in sentence:
+            if len(w) > 0 and w[0].isupper():
+                cleanedSentence.append(re.sub("\,|\.|\!|\?|\-|\'\:\;","",w))
+            else:
+                cleanedSentence.append(w)
+
+        # Collect all the potential bigrams
+        for i in range(len(cleanedSentence)):
+            word = cleanedSentence[i]
+            if len(word) > 0 and word[0].isupper():
+                # For every legit 1-gram, collect it and add to its score
+                if word not in words:
+                    words[word] = 1
+                else:
+                    words[word] += 1
+            if i < (len(cleanedSentence) - 1):
+                if word not in bigrams:
+                    bigrams[word] = dict() # For every word, we record its "partner"
+                    bigrams[word]["count"] = 0
+                if cleanedSentence[i + 1] not in bigrams[word]: # Freq of bigram
+                    bigrams[word][cleanedSentence[i + 1]] = 1
+                else:
+                    bigrams[word][cleanedSentence[i + 1]] += 1
+                bigrams[word]["count"] += 1
+                bigramCount += 1
+
+    # Clean out all the stopwords
+    for w in stopwords.words("english"):
+        words.pop(w.upper(),None)
+        words.pop(w, None)
+        words.pop(w.capitalize(), None)
+
+    # Now we get the top bigrams
+    topBigrams = list()
+    lowestProb = 1
+    for b in bigrams:
+        for b2 in bigrams[b]:
+            if b2 != 'count':
+                gram = b + " " + b2
+                prob = math.log(bigrams[b]['count']/bigramCount) + math.log(bigrams[b][b2]/bigrams[b]['count'])
+                element = (gram, prob)
+                topBigrams.append(element)
+
+    # Sort the top bigrams
+    wordList = list(words.items())
+    wordList.sort(key = lambda a: a[1], reverse=True)
+    topBigrams.sort(key = lambda a: a[1], reverse=True)
+    print("Total time for Bigram Search: " + str((time.time() - start)) + " seconds")
+    return wordList[:ngramsRet], topBigrams[:ngramsRet]
 
 #############################################################
 # Name: databaseSearcher                                    #
@@ -208,31 +278,33 @@ def resultCombiner(usefulTweets, potentialWinners):
 def databaseSearcher(resultsSoFar, category, database):
     start_time = time.time()
 
-    # First some search preprocessing
-    # Let's try filtering out the words that are like "whoohoo" or "yeeees"
-    for word in resultsSoFar:
-         if multiCharaFilter(word):
-             resultsSoFar = resultsSoFar.difference({word})
+    # First we need just the unigrams, not the vote counts
+    ngramStrings = [result[0] for result in resultsSoFar]
 
     finalAnswer = set() # List of all the people/movies
     searchCounter = 0
 
     # Now we need two sets - one for single name movies and another for multi-name
     confirmedNames = set() # The final set of guesses
-    allSearchResults = list() # All search results from IMDb
+    goodSearchResults = list() # Good search results from IMDb
 
-    for result in resultsSoFar:
+    for result in ngramStrings:
         if "winner" in category or "nominee" in category:
             try:
                 # Since we don't know if any given word corresponds to a movie
                 # or person, we search for both.
                 for searchResult in database.search_person(result):
-                    properResult = re.sub("\s*nickname", "", str(searchResult)) # Occurrences of nickname can pop up
-                    allSearchResults.append(properResult.lower())
+                    searchResAsString = str(searchResult)
+                    properResult = re.sub("\s*nickname", "", searchResAsString) # Occurrences of nickname can pop up
+                    if edit_distance(result, properResult) < 5:
+                        goodSearchResults.append(properResult.lower())
                 for searchResult in database.search_movie(result):
-                    allSearchResults.append(str(searchResult).lower())
+                    searchResAsString = str(searchResult)
+                    if edit_distance(result, searchResAsString) < 5:
+                        goodSearchResults.append(searchResAsString.lower())
                 searchCounter += 1
                 print("Completed " + str(searchCounter) + " searches of " + str(len(resultsSoFar)) + " total.")
+                print(len(goodSearchResults))
             except IMDbError as e:
                 print("Something went wrong with the search. Moving on to the next one.")
 
@@ -240,15 +312,15 @@ def databaseSearcher(resultsSoFar, category, database):
     if "winner" in category or "nominee" in category:
         # Idea is that if we have "Ben" and "Affleck" as separate entries,
         # we will find both names when we search each entry on its own
-        # All such situations correspond to the count > 1
-        uniqueValues = np.unique(allSearchResults, return_counts = True)
+        # All such situations correspond to count > 1
+        uniqueValues = np.unique(goodSearchResults, return_counts = True)
         uniqueNames = uniqueValues[0] # All the unique names
         nameOccurrenceCounts = uniqueValues[1] # How many times they occurred
         confirmedNames = set(uniqueNames[np.where(uniqueValues[1] > 1)])
 
     end_time = time.time()
     total_time = end_time - start_time
-    print("Total time for result combiner: " + str(total_time))
+    print("Total time for database search: " + str(total_time))
     return confirmedNames
 
 #############################################################
@@ -258,22 +330,33 @@ def databaseSearcher(resultsSoFar, category, database):
 #############################################################
 def main():
     nltk.download('averaged_perceptron_tagger')
+    nltk.download('stopwords')
     with open("gg2013.json") as tweetData:
         data = json.load(tweetData)
         imdbObj = IMDb()
-        # print()
-        # print("All the winners:")
-        # parsedResults = resultCombiner(keywordSearch(data, winnerKeywords), properNounFinder(data))
-        #
-        # # This is the final set of people
-        # print(databaseSearcher(parsedResults, "winner", imdbObj))
-        # print()
         print()
-        print("The nominees:")
-        parsedResults = resultCombiner(keywordSearch(data, nomineeKeywords), properNounFinder(data))
+        print("The winners:")
+        relevantTweets = keywordSearch(data, winnerKeywords)
+        # relevantTweets = awardTweetFinder(data)
+        topUnigrams, topBigrams = ngramDetector(relevantTweets)
 
         # This is the final set of people
-        print(databaseSearcher(parsedResults, "nominees", imdbObj))
+        relevantNgrams = list()
+        relevantNgrams.extend(topUnigrams)
+        relevantNgrams.extend(topBigrams)
+        print(databaseSearcher(relevantNgrams, "winner", imdbObj))
+        # print()
+        # print()
+        # print("The nominees:")
+        # relevantTweets = keywordSearch(data, nomineeKeywords)
+        # # relevantTweets = awardTweetFinder(data)
+        # topUnigrams, topBigrams = ngramDetector(relevantTweets)
+        #
+        # # This is the final set of people
+        # relevantNgrams = list()
+        # relevantNgrams.extend(topUnigrams)
+        # relevantNgrams.extend(topBigrams)
+        # print(databaseSearcher(relevantNgrams, "nominees", imdbObj))
 
 if __name__ == "__main__":
   main()

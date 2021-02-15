@@ -24,7 +24,7 @@ def get_nominees(year):
     '''Nominees is a dictionary with the hard coded award
     names as keys, and each entry a list of strings. Do NOT change
     the name of this function or what it returns.'''
-    print(year)
+    print(nominees)
     return dict()
     # return nominees
 
@@ -62,7 +62,7 @@ def main():
     and then run gg_api.main(). This is the second thing the TA will
     run when grading. Do NOT change the name of this function or
     what it returns.'''
-    pre_ceremony()
+    get_nominees("2013")
     return
 
 if __name__ == '__main__':

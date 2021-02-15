@@ -197,7 +197,7 @@ def awardTweetFinder(tweetData):
     return usefulTweets
 
 #############################################################
-# Name: ngramDetector                                       #
+# Name: ngramDetector (mostly adapted from Leif's code)     #
 # Params: tweetData (tweets that were filtered through the  #
 # award tweet rule)                                         #
 # Notes: Returns the proper nouns (i.e. names) in the       #

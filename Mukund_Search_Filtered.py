@@ -25,6 +25,7 @@ from nltk.tokenize import wordpunct_tokenize
 from nltk.corpus import stopwords
 from nltk.metrics.distance import edit_distance
 from imdb import IMDb, IMDbError
+import pandas as pd
 
 ###### Globals
 winnerKeywords = {"won": "left", "goes to": "right"}
@@ -208,7 +209,7 @@ def ngramDetector(tweetData):
     words = dict()
     bigrams = dict()
     bigramCount = 0
-    ngramsRet = 100 # How many ngrams to return
+    ngramsRet = 50 # How many ngrams to return
 
     for tweet in tweetData:
         sentence = tweet.split() # Split sentence into words
@@ -296,11 +297,11 @@ def databaseSearcher(resultsSoFar, category, database):
                 for searchResult in database.search_person(result):
                     searchResAsString = str(searchResult)
                     properResult = re.sub("\s*nickname", "", searchResAsString) # Occurrences of nickname can pop up
-                    if edit_distance(result, properResult) < 3:
+                    if edit_distance(result, properResult) < 2:
                         goodSearchResults.append(properResult.lower())
                 for searchResult in database.search_movie(result):
                     searchResAsString = str(searchResult)
-                    if edit_distance(result, searchResAsString) < 3:
+                    if edit_distance(result, searchResAsString) < 2:
                         goodSearchResults.append(searchResAsString.lower())
                 searchCounter += 1
                 print("Completed " + str(searchCounter) + " searches of " + str(len(resultsSoFar)) + " total.")
@@ -331,7 +332,7 @@ def databaseSearcher(resultsSoFar, category, database):
 def main():
     nltk.download('averaged_perceptron_tagger')
     nltk.download('stopwords')
-    with open("gg2013.json") as tweetData:
+    with open("gg2015.json") as tweetData:
         data = json.load(tweetData)
         imdbObj = IMDb()
         print()

@@ -2,7 +2,7 @@ import json
 import time
 
 start = time.time()
-data = json.loads(open('gg2015.json').read())
+data = json.loads(open('gg2013.json').read())
 tweets = []
 
 for d in data:
@@ -27,8 +27,11 @@ class wordNode:
 
 awards = wordNode("best")
 
+bestTweets = []
+
 for t in tweets:
     if "best" in t:
+        bestTweets.append(t)
         current = awards
         i = t.index("best") + 1
         end = False
@@ -86,10 +89,6 @@ for t in tweets:
             if b < g:
                 for i in range(b,g):
                     phrase = phrase + " " + t[i]
-                if phrase == "":
-                    print(t)
-                    print(b)
-                    print(g)
                 if phrase in awards:
                     awards[phrase] = awards[phrase] + 1
                 else:
@@ -129,7 +128,31 @@ for a1 in semiFinalAwards:
                 add = False
     if add:
         finalAwards.append(a1)
-    
-
 print(finalAwards)
 print("Time Elapsed: " + str((time.time() - start)) + "seconds")
+
+awardWordCount = dict()
+
+for t in bestTweets:
+    for s in finalAwards:
+        tContainsS = True
+        tCopy = t.copy()
+        for w in s:
+            if w not in t:
+                tContainsS = False
+                break
+            else:
+                tCopy.remove(w)
+        if tContainsS:
+            if finalAwards.index(s) not in awardWordCount:
+                awardWordCount[finalAwards.index(s)] = dict()
+            for w in tCopy:
+                if w not in awardWordCount[finalAwards.index(s)]:
+                    awardWordCount[finalAwards.index(s)][w] = 1
+                else:
+                    awardWordCount[finalAwards.index(s)][w] = awardWordCount[finalAwards.index(s)][w] + 1
+            
+print(finalAwards[5])
+sortedWordCount = list(awardWordCount[5].items())
+sortedWordCount.sort(key = lambda a: a[1])
+print(sortedWordCount)

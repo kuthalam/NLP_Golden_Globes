@@ -1,12 +1,55 @@
 import json
 import time
+import re
+import string
+
+
+def puncRemover(str):
+    for punc in punctuationToRemove:
+        if punc in str:
+            # Remove the punctuation and any charas next to it until a space
+            if punc == "?": # Because question marks cause regex issues
+                str = str.replace(punc, "")
+            else:
+                str = re.sub(punc + "!.*?\s", "", str) # Question: I don't understand why we should remove until a space?
+                # feels like it will delete some things might be useful for sentiment analysis or so?
+    return str
+
+def deEmojify(text):
+    regrex_pattern = re.compile(pattern = "["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                           "]+", flags = re.UNICODE)
+    return regrex_pattern.sub(r'',text)
+
+def isEnglish(s):
+    try:
+        s.encode(encoding='utf-8').decode('ascii')
+    except UnicodeDecodeError:
+        return False
+    else:
+        return True
+
+def retweetPhraseRemover(str):
+    # Question: I feel this will delete too much information,
+    # therefore I changed the re to be have more constraints
+    newStr = re.sub("https?:?([^\s]+)", "", str)
+    newStr = re.sub("(?i)RT.*@\w*:\s", "", newStr)
+    # Also remove tag starts with # or @, it should happen after removing retweet
+    return re.sub("[#|@]\w+", "", newStr)
+
+
+
 
 start = time.time()
 data = json.loads(open('gg2013.json').read())
 tweets = []
 
 for d in data:
-    sentence = d['text'].split()
+    sentence = retweetPhraseRemover(d['text'])
+    sentence = sentence.split()
     s = []
     for w in sentence:
         if w[0:4] != "http":
@@ -132,6 +175,13 @@ print(finalAwards)
 print("Time Elapsed: " + str((time.time() - start)) + "seconds")
 
 awardWordCount = dict()
+awardTweets = dict()
+
+awardWords = []
+for x in finalAwards:
+    for w in x:
+        if w not in awardWords:
+            awardWords.append(w)
 
 for t in bestTweets:
     for s in finalAwards:
@@ -144,6 +194,11 @@ for t in bestTweets:
             else:
                 tCopy.remove(w)
         if tContainsS:
+            tCopy2 = []
+            for w in tCopy:
+                if w not in awardWords:
+                    tCopy2.append(w)
+            tCopy = tCopy2
             if finalAwards.index(s) not in awardWordCount:
                 awardWordCount[finalAwards.index(s)] = dict()
             for w in tCopy:
@@ -151,8 +206,14 @@ for t in bestTweets:
                     awardWordCount[finalAwards.index(s)][w] = 1
                 else:
                     awardWordCount[finalAwards.index(s)][w] = awardWordCount[finalAwards.index(s)][w] + 1
-            
-print(finalAwards[5])
-sortedWordCount = list(awardWordCount[5].items())
-sortedWordCount.sort(key = lambda a: a[1])
-print(sortedWordCount)
+            if finalAwards.index(s) not in awardTweets:
+                awardTweets[finalAwards.index(s)] = []
+            awardTweets[finalAwards.index(s)].append(tCopy)
+
+
+
+for i in range(len(finalAwards)):           
+    print(finalAwards[i])
+    sortedWordCount = list(awardWordCount[i].items())
+    sortedWordCount.sort(key = lambda a: a[1])
+    print(sortedWordCount[len(sortedWordCount) - 11 :])

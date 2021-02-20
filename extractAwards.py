@@ -71,6 +71,7 @@ class wordNode:
 awards = wordNode("best")
 
 bestTweets = []
+hostGrams = dict()
 
 for t in tweets:
     if "best" in t:
@@ -96,7 +97,26 @@ for t in tweets:
                 word.count = word.count + 1
             current = word
             i = i + 1
-        
+    if "host" in t:
+        if "next" not in t and "year" not in t:
+            t2 = []
+            for w in t:
+                if w not in ["at","host","the","golden","globes","and"]:
+                    t2.append(w)
+            for i in range(len(t2) - 1):
+                if i < len(t2) - 1:
+                    twoGram = t2[i] + " " + t2[i+1]                
+                    if twoGram in hostGrams:
+                        hostGrams[twoGram] += 1
+                    else:
+                        hostGrams[twoGram] = 1
+                if i < len(t2) - 2:
+                    threeGram = t2[i] + " " + t2[i+1] + " " + t2[i+2]
+                    if threeGram in hostGrams:
+                        hostGrams[threeGram] += 1
+                    else:
+                        hostGrams[threeGram] = 1
+   
 def addWords(previous, word, container, p1, p2):
     if word.word == "END":
         container.append(previous)
@@ -234,9 +254,13 @@ for t in bestTweets:
 finalAwardGrams = []
 finalAwardBestGram = []
 finalAwardBestGrams = []
+finalAwardNomineeGuesses = []
+finalAwardPresenterGuess = []
 # Test on single index:
 for k in range(len(finalAwards)):
     phraseTree = []
+    presenterGuesses = dict()
+    nomineesGuesses = dict()
     sortedWordCount = list(awardWordCount[k].items())
     sortedWordCount.sort(key = lambda a: a[1])
     sortedWordCount2 = []
@@ -274,6 +298,30 @@ for k in range(len(finalAwards)):
                     word.count = word.count + 1
                     current = word
                     i = i + 1
+        if "nominees" in t:
+            for w in t:
+                if w not in ["nominees","are","for","and","to","the"]:
+                    t2.append(w)
+                for i in range(len(t2) - 1):
+                    twoGram = t2[i] + " " + t2[i+1]                
+                    if twoGram in nomineesGuesses:
+                        nomineesGuesses[twoGram] += 1
+                    else:
+                        nomineesGuesses[twoGram] = 1
+        if "presenting" in t or "presenter" in t:
+            for w in t:
+                if w not in ["nominees","are","for","and","to","the","presenter","presenting"]:
+                    t2.append(w)
+                for i in range(len(t2) - 1):
+                    twoGram = t2[i] + " " + t2[i+1]                
+                    if twoGram in presenterGuesses:
+                        presenterGuesses[twoGram] += 1
+                    else:
+                        presenterGuesses[twoGram] = 1
+        
+
+
+        
     
     phraseTree.sort(key = lambda a: a.count)
     bestGrams = []
@@ -328,8 +376,24 @@ for k in range(len(finalAwards)):
             max = finalists[k]
     if winner == "":
         winner = bestGrams[0]
-    
 
+ 
+    nomineesGuesses = list(nomineesGuesses.items())
+    nomineesGuesses.sort(key = lambda a: a[1])
+    if len(nomineesGuesses) > 5:
+        nomineesGuesses = nomineesGuesses[-5:][0]
+    else:
+        nomineesGuesses = []
+    presenterGuesses = list(presenterGuesses.items())
+    presenterGuesses.sort(key = lambda a: a[1])
+    if len(presenterGuesses) > 0:
+        presenterGuesses = presenterGuesses[-1][0]
+    else:
+        presenterGuesses = "Unknown"
+ 
+
+    finalAwardNomineeGuesses.append(nomineesGuesses)
+    finalAwardPresenterGuess.append(presenterGuesses)
     finalAwardBestGrams.append(bestGrams)
     finalAwardBestGram.append(winner)
 
@@ -341,9 +405,18 @@ for k in range(len(finalAwards)):
     '''
 
 for k in range(len(finalAwards)):
-    print(finalAwards[k])
-    print(finalAwardBestGram[k])
-    print(finalAwardBestGrams[k])
+    print("======================")
+    print("Award: " + " ".join(finalAwards[k]))
+    print("Winner: " + finalAwardBestGram[k])
+    print("Candidates: " + ", ".join(finalAwardBestGrams[k]))
+    print("Presenter: " + finalAwardPresenterGuess[k])
+    print("Nominees: ")
+    print(finalAwardNomineeGuesses[k])
+
+hostGuesses = list(hostGrams.items())
+hostGuesses.sort(key = lambda a: a[1])
+print("=========================")
+print("Host: " + hostGuesses[-1][0])
 
 
 '''

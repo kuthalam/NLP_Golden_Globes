@@ -32,6 +32,8 @@ winnerKeywords = {"won": "left", "goes to": "right"}
 awardKeywords = {"award for": "right"}
 nomineeKeywords = {"nominee": "right", "nominated": "left"}
 punctuationToRemove = {"!", "?", "#", "@"}
+peopleNames = set(pd.read_csv("Databases/name.basics.tsv", error_bad_lines = False, warn_bad_lines = False, sep="\t", low_memory = False)["primaryName"])
+movieNames = set(pd.read_csv("Databases/title.akas.tsv", error_bad_lines = False, warn_bad_lines = False, sep="\t")["title"])
 
 # Preprocessing utilities
 
@@ -294,15 +296,16 @@ def databaseSearcher(resultsSoFar, category, database):
             try:
                 # Since we don't know if any given word corresponds to a movie
                 # or person, we search for both.
-                for searchResult in database.search_person(result):
-                    searchResAsString = str(searchResult)
-                    properResult = re.sub("\s*nickname", "", searchResAsString) # Occurrences of nickname can pop up
-                    if edit_distance(result, properResult) < 2:
-                        goodSearchResults.append(properResult.lower())
-                for searchResult in database.search_movie(result):
-                    searchResAsString = str(searchResult)
-                    if edit_distance(result, searchResAsString) < 2:
-                        goodSearchResults.append(searchResAsString.lower())
+                for searchResult in peopleNames:
+                    if edit_distance(result, str(searchResult)) < 2:
+                        print(result)
+                        print(searchResult)
+                        goodSearchResults.append(searchResult.lower())
+                for searchResult in movieNames:
+                    if result in str(searchResult):
+                        print(result)
+                        print(searchResult)
+                        goodSearchResults.append(searchResult.lower())
                 searchCounter += 1
                 print("Completed " + str(searchCounter) + " searches of " + str(len(resultsSoFar)) + " total.")
                 print(len(goodSearchResults))
@@ -332,7 +335,7 @@ def databaseSearcher(resultsSoFar, category, database):
 def main():
     nltk.download('averaged_perceptron_tagger')
     nltk.download('stopwords')
-    with open("gg2015.json") as tweetData:
+    with open("gg2013.json") as tweetData:
         data = json.load(tweetData)
         imdbObj = IMDb()
         print()

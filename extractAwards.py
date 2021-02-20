@@ -44,7 +44,7 @@ def retweetPhraseRemover(str):
 
 
 start = time.time()
-data = json.loads(open('gg2013.json').read())
+data = json.loads(open('gg2015.json').read())
 tweets = []
 
 for d in data:
@@ -97,45 +97,69 @@ for t in tweets:
             current = word
             i = i + 1
         
-def addWords(previous, word, container):
+def addWords(previous, word, container, p1, p2):
     if word.word == "END":
         container.append(previous)
     else:
         end = False 
         for s in word.successors:
-            if s.word == "END" and s.count/word.count > 0.1:
+            if s.word == "END" and s.count/word.count > p1:
                 end = True
-                addWords(previous + " " + word.word, s, container)
+                addWords(previous + " " + word.word, s, container, p1, p2)
         if not end:
             for s in word.successors:
-                if s.count/word.count > 0.01:
-                    addWords(previous + " " + word.word, s, container)
+                if s.count/word.count > p2:
+                    addWords(previous + " " + word.word, s, container, p1, p2)
 wordList = []
-addWords("", awards, wordList)
+addWords("", awards, wordList, 0.1, 0.01)
 awardStrings2 = []
 for w in wordList:
     awardStrings2.append(w[1:])
 
+def bestGram(container):
+    gram = ""
+    max = 0
+    maxWord = ""
+    found = True
+    while maxWord != "END" and found:
+        max = 0
+        maxWord = ""
+        found = False
+        total = 0
+        for s in container:
+            total = total + s.count
+            if s.count > max:
+                max = s.count
+                maxWord = s.word
+                maxContainer = s.successors
+                found = True
+        if maxWord != "END" and (max / total) > 0.4:
+            gram = gram + " " + maxWord
+        else:
+            found = False
+        container = maxContainer
+    return gram 
+    
+
 
 awards = dict()
-for t in tweets:
-    if "best" in t:
-        g = 9999
-        for ender in ["goes"]:
-            if ender in t:
-                i = t.index(ender)
-                if i < g:
-                    g = i
-        if g != 9999:
-            b = t.index("best")
-            phrase = ""
-            if b < g:
-                for i in range(b,g):
-                    phrase = phrase + " " + t[i]
-                if phrase in awards:
-                    awards[phrase] = awards[phrase] + 1
-                else:
-                    awards[phrase] = 1
+for t in bestTweets:
+    g = 9999
+    for ender in ["goes"]:
+        if ender in t:
+            i = t.index(ender)
+            if i < g:
+                g = i
+    if g != 9999:
+        b = t.index("best")
+        phrase = ""
+        if b < g:
+            for i in range(b,g):
+                phrase = phrase + " " + t[i]
+            if phrase in awards:
+                awards[phrase] = awards[phrase] + 1
+            else:
+                awards[phrase] = 1
 
 awardsList = list(awards.items())
 awardsList.sort(key = lambda a: a[1])
@@ -171,8 +195,6 @@ for a1 in semiFinalAwards:
                 add = False
     if add:
         finalAwards.append(a1)
-print(finalAwards)
-print("Time Elapsed: " + str((time.time() - start)) + "seconds")
 
 awardWordCount = dict()
 awardTweets = dict()
@@ -209,11 +231,127 @@ for t in bestTweets:
             if finalAwards.index(s) not in awardTweets:
                 awardTweets[finalAwards.index(s)] = []
             awardTweets[finalAwards.index(s)].append(tCopy)
+finalAwardGrams = []
+finalAwardBestGram = []
+finalAwardBestGrams = []
+# Test on single index:
+for k in range(len(finalAwards)):
+    phraseTree = []
+    sortedWordCount = list(awardWordCount[k].items())
+    sortedWordCount.sort(key = lambda a: a[1])
+    sortedWordCount2 = []
+    for s in sortedWordCount:
+        if s[0] != "for" and s[0] != "to" and s[0] != "win" and s[0] != "wins" and s[0] != "of" and s[0] != "goes" and s[0] != "the" and s[0] != "amp":
+            sortedWordCount2.append(s)
+    sortedWordCount = sortedWordCount2[len(sortedWordCount2) - 11 :]
+    for t in awardTweets[k]:
+        for token in sortedWordCount:
+            if token[0] in t:
+                current = None
+                for s in phraseTree:
+                    if s.word == token[0]:
+                        current = s
+                        current.count = current.count + 1
+                if current == None:
+                    word = wordNode(token[0])
+                    phraseTree.append(word)
+                    current = word
+                i = t.index(token[0]) + 1
+                end = False
+                while i <= len(t) and end == False:
+                    if i == len(t):
+                        theWord = "END"
+                        end = True
+                    else:
+                        theWord = t[i]
+                    word = None
+                    for s in current.successors:
+                        if s.word == theWord:
+                            word = s
+                    if word == None:
+                        word = wordNode(theWord)
+                        current.successors.append(word)
+                    word.count = word.count + 1
+                    current = word
+                    i = i + 1
+    
+    phraseTree.sort(key = lambda a: a.count)
+    bestGrams = []
+    if len(phraseTree) > 0:
+        bestGrams.append(phraseTree[-1].word + bestGram(phraseTree[-1].successors))
+    if len(phraseTree) > 1:
+        bestGrams.append(phraseTree[-2].word + bestGram(phraseTree[-2].successors))
+    if len(phraseTree) > 2:
+        bestGrams.append(phraseTree[-3].word + bestGram(phraseTree[-3].successors))
+    
+    
+    semiFinalists = []
+
+    for g in bestGrams:
+        if " wins " in g:
+            g = g[:g.index(" wins ")]
+            semiFinalists.append(g)
+        if " for " in g:
+            g = g[:g.index(" for ")]
+            semiFinalists.append(g)
+        if " to " in g:
+            g = g[g.index(" to ") + 4:]
+            semiFinalists.append(g)
+
+    if len(semiFinalists) == 0:
+        for g in bestGrams:
+            semiFinalists.append(g)
+
+    finalists = dict()
+
+    if len(semiFinalists) > 1:
+        for i in range(len(semiFinalists)):
+            substring = False
+            for j in range(len(semiFinalists)):
+                if semiFinalists[i] in semiFinalists[j] and not i == j:
+                    substring = True
+                    if semiFinalists[i] in finalists:
+                        del finalists[semiFinalists[i]]
+                    if semiFinalists[j] not in finalists:
+                        finalists[semiFinalists[j]] = 2
+                    else:
+                        finalists[semiFinalists[j]] += 1
+            if not substring:
+                finalists[semiFinalists[i]] = 1
+    else:
+        finalists[semiFinalists[0]] = 3
+    max = 0
+    winner = ""
+    for k in finalists:
+        if finalists[k] > max:
+            winner = k
+            max = finalists[k]
+    if winner == "":
+        winner = bestGrams[0]
+    
+
+    finalAwardBestGrams.append(bestGrams)
+    finalAwardBestGram.append(winner)
+
+    '''
+    grams = []
+    for s in phraseTree:
+        addWords("",s,grams,0.3,0.6)
+    finalAwardGrams.append(grams)
+    '''
+
+for k in range(len(finalAwards)):
+    print(finalAwards[k])
+    print(finalAwardBestGram[k])
+    print(finalAwardBestGrams[k])
 
 
-
+'''
 for i in range(len(finalAwards)):           
     print(finalAwards[i])
     sortedWordCount = list(awardWordCount[i].items())
     sortedWordCount.sort(key = lambda a: a[1])
     print(sortedWordCount[len(sortedWordCount) - 11 :])
+'''
+
+print("Final Time Elapsed: " + str((time.time() - start)) + "seconds")

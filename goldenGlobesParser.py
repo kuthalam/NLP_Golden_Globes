@@ -479,13 +479,19 @@ def dumpResults(data, fname):
     with open(fname, "w") as f:
         print(json.dumps(data), file=f)
 
-if len(sys.argv) > 1:
-    start = time.time()
-    theYear = sys.argv[1]
-    theData = getData(theYear)
-    printResults(theData,"answers-%s.txt"%theYear,theYear)
-    dumpResults(theData,"answers-%s.json"%theYear)
-    print("Time Elapsed: " + str((time.time() - start)) + " seconds.")
+def doOutPutToFiles(theYear):
+        theData = getData(theYear)
+        printResults(theData,"answers-%s.txt"%theYear,theYear)
+        dumpResults(theData,"answers-%s.json"%theYear)
 
-else:
-    print("Please specify a year.")
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        start = time.time()
+        theYear = sys.argv[1]
+        theData = getData(theYear)
+        printResults(theData,"answers-%s.txt"%theYear,theYear)
+        dumpResults(theData,"answers-%s.json"%theYear)
+        print("Time Elapsed: " + str((time.time() - start)) + " seconds.")
+
+    else:
+        print("Please specify a year.")
